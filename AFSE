@@ -16,10 +16,11 @@ local Tabs = {
     Teleports = Window:AddTab({ Title = "Teleports", Icon = "map-pin" }),
     ESP = Window:AddTab({ Title = "ESP", Icon = "eye" }),
     Chikara = Window:AddTab({ Title = "Chikara", Icon = "gift" }),
-    Mobs = Window:AddTab({ Title = "Mobs", Icon = "swords" })
+    Mobs = Window:AddTab({ Title = "Mobs", Icon = "swords" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "box" })
 }
 
--- Autofarm Tab Content
+-- Autofarm Tab Content (unchanged)
 Tabs.Autofarm:AddParagraph({Title = "Autofarm Features", Content = "Toggle the features below to enable or disable automatic actions."})
 
 local TrainEnabled = false
@@ -65,7 +66,6 @@ local SwordEnabled = false
 Tabs.Autofarm:AddToggle("AutoSword", {Title = "Auto Farm Sword", Default = false, Callback = function(state) 
     SwordEnabled = state 
     if state then 
-        -- Equip the sword once when enabling
         local args = {"ActivateSword"}
         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
         
@@ -93,7 +93,7 @@ Tabs.Autofarm:AddToggle("AutoSpeedAgility", {Title = "Auto Farm Speed & Agility"
     end 
 end})
 
--- Teleports Tab
+-- Teleports Tab (unchanged)
 Tabs.Teleports:AddParagraph({Title = "Teleports", Content = "Select a training area below to teleport there."})
 
 Tabs.Teleports:AddParagraph({
@@ -179,10 +179,9 @@ Tabs.Teleports:AddButton({
     end
 })
 
--- ESP Tab
+-- ESP Tab (unchanged)
 Tabs.ESP:AddParagraph({Title = "ESP Features", Content = "Toggle the features below to enable or disable ESP visuals."})
 
--- Chikara Boxes ESP
 local CurrentChikaraFill = Color3.fromRGB(255, 0, 0)
 local CurrentChikaraOutline = Color3.fromRGB(255, 255, 255)
 local chikaraHighlights = {}
@@ -228,7 +227,6 @@ Tabs.ESP:AddToggle("ChikaraBoxes", {
     end
 })
 
--- Mob ESP Section
 local CurrentMobFill = Color3.fromRGB(255, 0, 255)
 local CurrentMobOutline = Color3.fromRGB(255, 255, 255)
 local mobHighlights = {}
@@ -300,10 +298,20 @@ Tabs.Mobs:AddParagraph({
 
 local autoFarmSarkaEnabled = false
 local autoFarmGenEnabled = false
+local autoAttackEnabled = false  -- Tracks if the remote attack is active
 
-local function equipSword()
-    local args = {"ActivateSword"}
-    game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
+local function enableAutoAttack()
+    if autoAttackEnabled then return end  -- Already active, don't re-fire
+    local args = {"Setting", 10}
+    pcall(function()
+        game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RemoteFunction"):InvokeServer(unpack(args))
+    end)
+    autoAttackEnabled = true
+end
+
+local function disableAutoAttack()
+    -- We don't disable it because turning off one mob farm shouldn't stop the other
+    -- Only disable if both are off (handled in toggles)
 end
 
 Tabs.Mobs:AddToggle("AutoFarmSarka", {
@@ -312,7 +320,7 @@ Tabs.Mobs:AddToggle("AutoFarmSarka", {
     Callback = function(state)
         autoFarmSarkaEnabled = state
         if state then
-            equipSword()  -- Equip sword when enabled
+            enableAutoAttack()  -- Turn on the remote attack
             spawn(function()
                 while autoFarmSarkaEnabled do
                     local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
@@ -322,28 +330,29 @@ Tabs.Mobs:AddToggle("AutoFarmSarka", {
                     local closestDist = math.huge
                     for _, mob in ipairs(mobFolder:GetChildren()) do
                         if mob.Name == "1" and mob:FindFirstChild("HumanoidRootPart") then
-                            local mobRoot = mob.HumanoidRootPart
-                            local dist = (hrp.Position - mobRoot.Position).Magnitude
-                            if dist < closestDist then
-                                closestDist = dist
-                                closestMob = mob
+                            local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+                            if mobRoot then
+                                local dist = (hrp.Position - mobRoot.Position).Magnitude
+                                if dist < closestDist then
+                                    closestDist = dist
+                                    closestMob = mob
+                                end
                             end
                         end
                     end
-                    if closestMob and closestMob:FindFirstChild("HumanoidRootPart") then
-                        hrp.CFrame = closestMob.HumanoidRootPart.CFrame
-                        local sword = character:FindFirstChildOfClass("Tool")
-                        if sword then
-                            for i = 1, 5 do
-                                if not autoFarmSarkaEnabled then break end
-                                sword:Activate()  -- Swing sword without clicks
-                                wait(0.05)
-                            end
+                    if closestMob then
+                        local mobRoot = closestMob:FindFirstChild("HumanoidRootPart")
+                        if mobRoot then
+                            hrp.CFrame = mobRoot.CFrame
                         end
                     end
-                    wait(0.05)
+                    wait(0.1)  -- Faster loop since attack is handled by remote
                 end
             end)
+        else
+            if not autoFarmGenEnabled then
+                autoAttackEnabled = false  -- Only disable if no mob farm is active
+            end
         end
     end
 })
@@ -354,7 +363,7 @@ Tabs.Mobs:AddToggle("AutoFarmGen", {
     Callback = function(state)
         autoFarmGenEnabled = state
         if state then
-            equipSword()  -- Equip sword when enabled
+            enableAutoAttack()  -- Turn on the remote attack
             spawn(function()
                 while autoFarmGenEnabled do
                     local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
@@ -364,33 +373,34 @@ Tabs.Mobs:AddToggle("AutoFarmGen", {
                     local closestDist = math.huge
                     for _, mob in ipairs(mobFolder:GetChildren()) do
                         if mob.Name == "2" and mob:FindFirstChild("HumanoidRootPart") then
-                            local mobRoot = mob.HumanoidRootPart
-                            local dist = (hrp.Position - mobRoot.Position).Magnitude
-                            if dist < closestDist then
-                                closestDist = dist
-                                closestMob = mob
+                            local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+                            if mobRoot then
+                                local dist = (hrp.Position - mobRoot.Position).Magnitude
+                                if dist < closestDist then
+                                    closestDist = dist
+                                    closestMob = mob
+                                end
                             end
                         end
                     end
-                    if closestMob and closestMob:FindFirstChild("HumanoidRootPart") then
-                        hrp.CFrame = closestMob.HumanoidRootPart.CFrame
-                        local sword = character:FindFirstChildOfClass("Tool")
-                        if sword then
-                            for i = 1, 5 do
-                                if not autoFarmGenEnabled then break end
-                                sword:Activate()  -- Swing sword without clicks
-                                wait(0.05)
-                            end
+                    if closestMob then
+                        local mobRoot = closestMob:FindFirstChild("HumanoidRootPart")
+                        if mobRoot then
+                            hrp.CFrame = mobRoot.CFrame
                         end
                     end
-                    wait(0.05)
+                    wait(0.1)
                 end
             end)
+        else
+            if not autoFarmSarkaEnabled then
+                autoAttackEnabled = false
+            end
         end
     end
 })
 
--- Chikara Tab
+-- Chikara Tab (unchanged)
 Tabs.Chikara:AddParagraph({Title = "Chikara Auto Farm", Content = "Automatically teleports to and collects Chikara Boxes by clicking them."})
 
 Tabs.Chikara:AddParagraph({
@@ -405,13 +415,12 @@ local function clickChikaraBox(boxPart)
     local cam = workspace.CurrentCamera
     local pos, onScreen = cam:WorldToScreenPoint(boxPart.Position)
     if onScreen then
+        local VirtualInputManager = game:GetService("VirtualInputManager")
         VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
         wait()
         VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
     end
 end
-
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 Tabs.Chikara:AddToggle("AutoFarmChikara", {
     Title = "Auto Farm Chikara Box",
@@ -436,6 +445,21 @@ Tabs.Chikara:AddToggle("AutoFarmChikara", {
                     wait(0.3)
                 end
             end)
+        end
+    end
+})
+
+-- Misc Tab (unchanged)
+Tabs.Misc:AddParagraph({Title = "Miscellaneous", Content = "Extra useful features."})
+
+local AntiAFKEnabled = false
+Tabs.Misc:AddToggle("AntiAFK", {
+    Title = "Anti AFK",
+    Default = false,
+    Callback = function(state)
+        AntiAFKEnabled = state
+        if state then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/hassanxzayn-lua/Anti-afk/main/antiafkbyhassanxzyn"))()
         end
     end
 })
