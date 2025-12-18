@@ -1,0 +1,441 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "AFSE | #1 Script " .. Fluent.Version,
+    SubTitle = "by VisualDoggyStudios",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+    Autofarm = Window:AddTab({ Title = "Autofarm", Icon = "bot" }),
+    Teleports = Window:AddTab({ Title = "Teleports", Icon = "map-pin" }),
+    ESP = Window:AddTab({ Title = "ESP", Icon = "eye" }),
+    Chikara = Window:AddTab({ Title = "Chikara", Icon = "gift" }),
+    Mobs = Window:AddTab({ Title = "Mobs", Icon = "swords" })
+}
+
+-- Autofarm Tab Content
+Tabs.Autofarm:AddParagraph({Title = "Autofarm Features", Content = "Toggle the features below to enable or disable automatic actions."})
+
+local TrainEnabled = false
+Tabs.Autofarm:AddToggle("AutoTrain", {Title = "Auto Train Strength", Default = false, Callback = function(state) 
+    TrainEnabled = state 
+    if state then 
+        spawn(function() 
+            while TrainEnabled do 
+                game:GetService("ReplicatedStorage").Remotes.RemoteEvent:FireServer("Train", 1) 
+                wait(0.1) 
+            end 
+        end) 
+    end 
+end})
+
+local DurabilityEnabled = false
+Tabs.Autofarm:AddToggle("AutoDurability", {Title = "Auto Farm Durability", Default = false, Callback = function(state) 
+    DurabilityEnabled = state 
+    if state then 
+        spawn(function() 
+            while DurabilityEnabled do 
+                game:GetService("ReplicatedStorage").Remotes.RemoteEvent:FireServer("Train", 2) 
+                wait(0.1) 
+            end 
+        end) 
+    end 
+end})
+
+local ChakraEnabled = false
+Tabs.Autofarm:AddToggle("AutoChakra", {Title = "Auto Farm Chakra", Default = false, Callback = function(state) 
+    ChakraEnabled = state 
+    if state then 
+        spawn(function() 
+            while ChakraEnabled do 
+                game:GetService("ReplicatedStorage").Remotes.RemoteEvent:FireServer("Train", 3) 
+                wait(0.1) 
+            end 
+        end) 
+    end 
+end})
+
+local SwordEnabled = false
+Tabs.Autofarm:AddToggle("AutoSword", {Title = "Auto Farm Sword", Default = false, Callback = function(state) 
+    SwordEnabled = state 
+    if state then 
+        -- Equip the sword once when enabling
+        local args = {"ActivateSword"}
+        game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
+        
+        spawn(function() 
+            while SwordEnabled do 
+                game:GetService("ReplicatedStorage").Remotes.RemoteEvent:FireServer("Train", 4) 
+                wait(0.1) 
+            end 
+        end) 
+    end 
+end})
+
+local SpeedAgilityEnabled = false
+Tabs.Autofarm:AddToggle("AutoSpeedAgility", {Title = "Auto Farm Speed & Agility", Default = false, Callback = function(state) 
+    SpeedAgilityEnabled = state 
+    if state then 
+        spawn(function() 
+            while SpeedAgilityEnabled do 
+                game:GetService("ReplicatedStorage").Remotes.RemoteEvent:FireServer("Train", 5) 
+                wait(0.1) 
+                game:GetService("ReplicatedStorage").Remotes.RemoteEvent:FireServer("Train", 6) 
+                wait(0.1) 
+            end 
+        end) 
+    end 
+end})
+
+-- Teleports Tab
+Tabs.Teleports:AddParagraph({Title = "Teleports", Content = "Select a training area below to teleport there."})
+
+Tabs.Teleports:AddParagraph({
+    Title = "Note",
+    Content = "Sorry, the devs named the training areas kinda weird — just test a few to figure out which one takes you where! 😅"
+})
+
+local trainingFolder = game:GetService("Workspace").Scriptable.TrainingAreas
+
+local function getTrainingAreaNames()
+    local names = {}
+    for _, area in ipairs(trainingFolder:GetChildren()) do
+        if area:IsA("BasePart") or area:IsA("Model") then
+            table.insert(names, area.Name)
+        end
+    end
+    table.sort(names)
+    return names
+end
+
+local function isPlayerClipped()
+    local character = game.Players.LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    local hrp = character.HumanoidRootPart
+    
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {character}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    local directions = {
+        Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0),
+        Vector3.new(0, 0, 1), Vector3.new(0, 0, -1),
+        Vector3.new(0, 1, 0), Vector3.new(0, -1, 0)
+    }
+    
+    for _, dir in ipairs(directions) do
+        local result = workspace:Raycast(hrp.Position, dir * 5, params)
+        if result then
+            return true
+        end
+    end
+    return false
+end
+
+local teleportDropdown = Tabs.Teleports:AddDropdown("TrainingAreaTeleport", {
+    Title = "Training Areas",
+    Values = getTrainingAreaNames(),
+    Default = 1,
+    Callback = function(selectedName)
+        local area = trainingFolder:FindFirstChild(selectedName)
+        if not area or not game.Players.LocalPlayer.Character then return end
+        
+        local character = game.Players.LocalPlayer.Character
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        
+        local targetCFrame
+        if area:IsA("Model") then
+            if area.PrimaryPart then
+                targetCFrame = area.PrimaryPart.CFrame
+            else
+                local cf, _ = area:GetBoundingBox()
+                targetCFrame = cf
+            end
+        else
+            targetCFrame = area.CFrame
+        end
+        
+        hrp.CFrame = targetCFrame
+        
+        wait(0.2)
+        
+        if isPlayerClipped() then
+            hrp.CFrame = targetCFrame + Vector3.new(0, 110, 0)
+        end
+    end
+})
+
+Tabs.Teleports:AddButton({
+    Title = "Refresh Training Areas List",
+    Callback = function()
+        teleportDropdown:Refresh(getTrainingAreaNames(), true)
+    end
+})
+
+-- ESP Tab
+Tabs.ESP:AddParagraph({Title = "ESP Features", Content = "Toggle the features below to enable or disable ESP visuals."})
+
+-- Chikara Boxes ESP
+local CurrentChikaraFill = Color3.fromRGB(255, 0, 0)
+local CurrentChikaraOutline = Color3.fromRGB(255, 255, 255)
+local chikaraHighlights = {}
+local chikaraConnection = nil
+
+local function updateChikaraHighlights()
+    for _, h in pairs(chikaraHighlights) do 
+        if h and h.Parent then 
+            h.FillColor = CurrentChikaraFill 
+            h.OutlineColor = CurrentChikaraOutline 
+        end 
+    end
+end
+
+Tabs.ESP:AddColorpicker("ChikaraFillColor", {Title = "Chikara Fill Color", Default = CurrentChikaraFill, Callback = function(c) CurrentChikaraFill = c updateChikaraHighlights() end})
+Tabs.ESP:AddColorpicker("ChikaraOutlineColor", {Title = "Chikara Outline Color", Default = CurrentChikaraOutline, Callback = function(c) CurrentChikaraOutline = c updateChikaraHighlights() end})
+
+Tabs.ESP:AddToggle("ChikaraBoxes", {
+    Title = "Chikara Boxes",
+    Default = false,
+    Callback = function(state)
+        local folder = workspace.Scriptable.ChikaraBoxes
+        local function addHighlight(obj)
+            if not chikaraHighlights[obj] then
+                local h = Instance.new("Highlight")
+                h.FillColor = CurrentChikaraFill
+                h.OutlineColor = CurrentChikaraOutline
+                h.FillTransparency = 0.5
+                h.OutlineTransparency = 0
+                h.Parent = obj
+                chikaraHighlights[obj] = h
+                obj.Destroying:Connect(function() chikaraHighlights[obj] = nil end)
+            end
+        end
+        if state then
+            for _, obj in ipairs(folder:GetChildren()) do addHighlight(obj) end
+            chikaraConnection = folder.ChildAdded:Connect(addHighlight)
+        else
+            for _, h in pairs(chikaraHighlights) do if h then h:Destroy() end end
+            chikaraHighlights = {}
+            if chikaraConnection then chikaraConnection:Disconnect() chikaraConnection = nil end
+        end
+    end
+})
+
+-- Mob ESP Section
+local CurrentMobFill = Color3.fromRGB(255, 0, 255)
+local CurrentMobOutline = Color3.fromRGB(255, 255, 255)
+local mobHighlights = {}
+local mobConnection = nil
+
+local function updateMobHighlights()
+    for _, h in pairs(mobHighlights) do
+        if h and h.Parent then
+            h.FillColor = CurrentMobFill
+            h.OutlineColor = CurrentMobOutline
+        end
+    end
+end
+
+local function clearAllMobHighlights()
+    if mobConnection then mobConnection:Disconnect() mobConnection = nil end
+    for _, h in pairs(mobHighlights) do if h then h:Destroy() end end
+    mobHighlights = {}
+end
+
+local function addHighlight(obj)
+    if not mobHighlights[obj] then
+        local h = Instance.new("Highlight")
+        h.Name = "MobESP"
+        h.FillColor = CurrentMobFill
+        h.OutlineColor = CurrentMobOutline
+        h.FillTransparency = 0.4
+        h.OutlineTransparency = 0
+        h.Parent = obj
+        mobHighlights[obj] = h
+        obj.Destroying:Connect(function() mobHighlights[obj] = nil end)
+    end
+end
+
+local function applyMobESP(mobType)
+    clearAllMobHighlights()
+    if mobType == "None" then return end
+    local mobFolder = workspace.Scriptable.Mobs
+    local function shouldHighlight(obj)
+        if mobType == "Sarka" then return obj.Name == "1"
+        elseif mobType == "Gen" then return obj.Name == "2" end
+        return false
+    end
+    for _, obj in ipairs(mobFolder:GetChildren()) do
+        if shouldHighlight(obj) then addHighlight(obj) end
+    end
+    mobConnection = mobFolder.ChildAdded:Connect(function(child)
+        if shouldHighlight(child) then addHighlight(child) end
+    end)
+end
+
+Tabs.ESP:AddColorpicker("MobFillColor", {Title = "Mob Fill Color", Default = CurrentMobFill, Callback = function(c) CurrentMobFill = c updateMobHighlights() end})
+Tabs.ESP:AddColorpicker("MobOutlineColor", {Title = "Mob Outline Color", Default = CurrentMobOutline, Callback = function(c) CurrentMobOutline = c updateMobHighlights() end})
+
+Tabs.ESP:AddDropdown("MobESPSelector", {
+    Title = "Mob ESP",
+    Values = {"None", "Sarka", "Gen"},
+    Default = "None",
+    Callback = function(value)
+        applyMobESP(value)
+    end
+})
+
+-- Mobs Tab
+Tabs.Mobs:AddParagraph({
+    Title = "Mob Features",
+    Content = "Warning: Move the script menu away from the center before enabling auto-farm (clicking may interfere with GUI)."
+})
+
+local autoFarmSarkaEnabled = false
+local autoFarmGenEnabled = false
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local function clickAttack()
+    VirtualInputManager:SendMouseButtonEvent(100, 100, 0, true, game, 0)
+    wait(0.03)
+    VirtualInputManager:SendMouseButtonEvent(100, 100, 0, false, game, 0)
+end
+
+Tabs.Mobs:AddToggle("AutoFarmSarka", {
+    Title = "Auto Farm Sarka",
+    Default = false,
+    Callback = function(state)
+        autoFarmSarkaEnabled = state
+        if state then
+            spawn(function()
+                while autoFarmSarkaEnabled do
+                    local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+                    local hrp = character:WaitForChild("HumanoidRootPart")
+                    local mobFolder = workspace.Scriptable.Mobs
+                    local closestMob = nil
+                    local closestDist = math.huge
+                    for _, mob in ipairs(mobFolder:GetChildren()) do
+                        if mob.Name == "1" and mob:FindFirstChild("HumanoidRootPart") then
+                            local mobRoot = mob.HumanoidRootPart
+                            local dist = (hrp.Position - mobRoot.Position).Magnitude
+                            if dist < closestDist then
+                                closestDist = dist
+                                closestMob = mob
+                            end
+                        end
+                    end
+                    if closestMob and closestMob:FindFirstChild("HumanoidRootPart") then
+                        hrp.CFrame = closestMob.HumanoidRootPart.CFrame
+                        for i = 1, 5 do
+                            if not autoFarmSarkaEnabled then break end
+                            clickAttack()
+                            wait(0.05)
+                        end
+                    end
+                    wait(0.05)
+                end
+            end)
+        end
+    end
+})
+
+Tabs.Mobs:AddToggle("AutoFarmGen", {
+    Title = "Auto Farm Gen",
+    Default = false,
+    Callback = function(state)
+        autoFarmGenEnabled = state
+        if state then
+            spawn(function()
+                while autoFarmGenEnabled do
+                    local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+                    local hrp = character:WaitForChild("HumanoidRootPart")
+                    local mobFolder = workspace.Scriptable.Mobs
+                    local closestMob = nil
+                    local closestDist = math.huge
+                    for _, mob in ipairs(mobFolder:GetChildren()) do
+                        if mob.Name == "2" and mob:FindFirstChild("HumanoidRootPart") then
+                            local mobRoot = mob.HumanoidRootPart
+                            local dist = (hrp.Position - mobRoot.Position).Magnitude
+                            if dist < closestDist then
+                                closestDist = dist
+                                closestMob = mob
+                            end
+                        end
+                    end
+                    if closestMob and closestMob:FindFirstChild("HumanoidRootPart") then
+                        hrp.CFrame = closestMob.HumanoidRootPart.CFrame
+                        for i = 1, 5 do
+                            if not autoFarmGenEnabled then break end
+                            clickAttack()
+                            wait(0.05)
+                        end
+                    end
+                    wait(0.05)
+                end
+            end)
+        end
+    end
+})
+
+-- Chikara Tab
+Tabs.Chikara:AddParagraph({Title = "Chikara Auto Farm", Content = "Automatically teleports to and collects Chikara Boxes by clicking them."})
+
+Tabs.Chikara:AddParagraph({
+    Title = "Important Note",
+    Content = "After enabling the auto farm, make sure to minimize the menu by pressing Left Control (LCTRL) so the clicks can reach the boxes!"
+})
+
+local AutoFarmChikaraEnabled = false
+
+local function clickChikaraBox(boxPart)
+    if not boxPart then return end
+    local cam = workspace.CurrentCamera
+    local pos, onScreen = cam:WorldToScreenPoint(boxPart.Position)
+    if onScreen then
+        VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
+        wait()
+        VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
+    end
+end
+
+Tabs.Chikara:AddToggle("AutoFarmChikara", {
+    Title = "Auto Farm Chikara Box",
+    Default = false,
+    Callback = function(state)
+        AutoFarmChikaraEnabled = state
+        if state then
+            spawn(function()
+                while AutoFarmChikaraEnabled do
+                    local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+                    local hrp = character:WaitForChild("HumanoidRootPart")
+                    local folder = workspace.Scriptable.ChikaraBoxes
+                    for _, box in ipairs(folder:GetChildren()) do
+                        if not AutoFarmChikaraEnabled then break end
+                        if box:IsA("BasePart") then
+                            hrp.CFrame = box.CFrame
+                            wait(0.05)
+                            clickChikaraBox(box)
+                            wait(0.15)
+                        end
+                    end
+                    wait(0.3)
+                end
+            end)
+        end
+    end
+})
+
+-- Settings Tab
+Tabs.Settings:AddDropdown("ThemeSelector", {
+    Title = "UI Theme",
+    Values = {"Dark", "Light", "Aqua", "Amethyst", "Rose"},
+    Default = "Dark",
+    Callback = function(t) Fluent:SetTheme(t) end
+})
