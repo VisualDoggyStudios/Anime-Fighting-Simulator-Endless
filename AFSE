@@ -300,12 +300,10 @@ Tabs.Mobs:AddParagraph({
 
 local autoFarmSarkaEnabled = false
 local autoFarmGenEnabled = false
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
-local function clickAttack()
-    VirtualInputManager:SendMouseButtonEvent(100, 100, 0, true, game, 0)
-    wait(0.03)
-    VirtualInputManager:SendMouseButtonEvent(100, 100, 0, false, game, 0)
+local function equipSword()
+    local args = {"ActivateSword"}
+    game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
 end
 
 Tabs.Mobs:AddToggle("AutoFarmSarka", {
@@ -314,6 +312,7 @@ Tabs.Mobs:AddToggle("AutoFarmSarka", {
     Callback = function(state)
         autoFarmSarkaEnabled = state
         if state then
+            equipSword()  -- Equip sword when enabled
             spawn(function()
                 while autoFarmSarkaEnabled do
                     local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
@@ -333,10 +332,13 @@ Tabs.Mobs:AddToggle("AutoFarmSarka", {
                     end
                     if closestMob and closestMob:FindFirstChild("HumanoidRootPart") then
                         hrp.CFrame = closestMob.HumanoidRootPart.CFrame
-                        for i = 1, 5 do
-                            if not autoFarmSarkaEnabled then break end
-                            clickAttack()
-                            wait(0.05)
+                        local sword = character:FindFirstChildOfClass("Tool")
+                        if sword then
+                            for i = 1, 5 do
+                                if not autoFarmSarkaEnabled then break end
+                                sword:Activate()  -- Swing sword without clicks
+                                wait(0.05)
+                            end
                         end
                     end
                     wait(0.05)
@@ -352,6 +354,7 @@ Tabs.Mobs:AddToggle("AutoFarmGen", {
     Callback = function(state)
         autoFarmGenEnabled = state
         if state then
+            equipSword()  -- Equip sword when enabled
             spawn(function()
                 while autoFarmGenEnabled do
                     local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
@@ -371,10 +374,13 @@ Tabs.Mobs:AddToggle("AutoFarmGen", {
                     end
                     if closestMob and closestMob:FindFirstChild("HumanoidRootPart") then
                         hrp.CFrame = closestMob.HumanoidRootPart.CFrame
-                        for i = 1, 5 do
-                            if not autoFarmGenEnabled then break end
-                            clickAttack()
-                            wait(0.05)
+                        local sword = character:FindFirstChildOfClass("Tool")
+                        if sword then
+                            for i = 1, 5 do
+                                if not autoFarmGenEnabled then break end
+                                sword:Activate()  -- Swing sword without clicks
+                                wait(0.05)
+                            end
                         end
                     end
                     wait(0.05)
@@ -404,6 +410,8 @@ local function clickChikaraBox(boxPart)
         VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
     end
 end
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 Tabs.Chikara:AddToggle("AutoFarmChikara", {
     Title = "Auto Farm Chikara Box",
