@@ -21,6 +21,18 @@ local Tabs = {
     Misc = Window:AddTab({ Title = "Misc", Icon = "box" })
 }
 
+-- Auto-copy Discord invite on script start (no link in notification)
+spawn(function()
+    local inviteLink = "https://discord.gg/aasNAxsT3P"
+    setclipboard(inviteLink)
+    
+    Fluent:Notify({
+        Title = "Discord Invite",
+        Content = "Invite link copied to clipboard!\nJoin for updates & support!",
+        Duration = 8
+    })
+end)
+
 -- Autofarm Tab Content
 Tabs.Autofarm:AddParagraph({Title = "Autofarm Features", Content = "Toggle the features below to enable or disable automatic actions."})
 
@@ -142,6 +154,7 @@ end
 local teleportDropdown = Tabs.Teleports:AddDropdown("TrainingAreaTeleport", {
     Title = "Training Areas",
     Values = getTrainingAreaNames(),
+    Multi = false,
     Default = 1,
     Callback = function(selectedName)
         local area = trainingFolder:FindFirstChild(selectedName)
@@ -175,8 +188,15 @@ local teleportDropdown = Tabs.Teleports:AddDropdown("TrainingAreaTeleport", {
 
 Tabs.Teleports:AddButton({
     Title = "Refresh Training Areas List",
+    Description = "Updates the dropdown if new areas appear",
     Callback = function()
-        teleportDropdown:Refresh(getTrainingAreaNames(), true)
+        local newValues = getTrainingAreaNames()
+        teleportDropdown:Refresh(newValues, true)
+        Fluent:Notify({
+            Title = "Teleports",
+            Content = "Training areas list refreshed! (" .. #newValues .. " areas found)",
+            Duration = 4
+        })
     end
 })
 
