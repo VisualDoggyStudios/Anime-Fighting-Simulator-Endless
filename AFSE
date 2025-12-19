@@ -17,10 +17,11 @@ local Tabs = {
     ESP = Window:AddTab({ Title = "ESP", Icon = "eye" }),
     Chikara = Window:AddTab({ Title = "Chikara", Icon = "gift" }),
     Mobs = Window:AddTab({ Title = "Mobs", Icon = "swords" }),
+    Codes = Window:AddTab({ Title = "Codes", Icon = "ticket" }),
     Misc = Window:AddTab({ Title = "Misc", Icon = "box" })
 }
 
--- Autofarm Tab Content (unchanged)
+-- Autofarm Tab Content
 Tabs.Autofarm:AddParagraph({Title = "Autofarm Features", Content = "Toggle the features below to enable or disable automatic actions."})
 
 local TrainEnabled = false
@@ -93,7 +94,7 @@ Tabs.Autofarm:AddToggle("AutoSpeedAgility", {Title = "Auto Farm Speed & Agility"
     end 
 end})
 
--- Teleports Tab (unchanged)
+-- Teleports Tab
 Tabs.Teleports:AddParagraph({Title = "Teleports", Content = "Select a training area below to teleport there."})
 
 Tabs.Teleports:AddParagraph({
@@ -179,7 +180,7 @@ Tabs.Teleports:AddButton({
     end
 })
 
--- ESP Tab (unchanged)
+-- ESP Tab
 Tabs.ESP:AddParagraph({Title = "ESP Features", Content = "Toggle the features below to enable or disable ESP visuals."})
 
 local CurrentChikaraFill = Color3.fromRGB(255, 0, 0)
@@ -267,7 +268,10 @@ local function applyMobESP(mobType)
     local mobFolder = workspace.Scriptable.Mobs
     local function shouldHighlight(obj)
         if mobType == "Sarka" then return obj.Name == "1"
-        elseif mobType == "Gen" then return obj.Name == "2" end
+        elseif mobType == "Gen" then return obj.Name == "2"
+        elseif mobType == "Igicho" then return obj.Name == "3"
+        elseif mobType == "Booh" then return obj.Name == "5"
+        end
         return false
     end
     for _, obj in ipairs(mobFolder:GetChildren()) do
@@ -283,7 +287,7 @@ Tabs.ESP:AddColorpicker("MobOutlineColor", {Title = "Mob Outline Color", Default
 
 Tabs.ESP:AddDropdown("MobESPSelector", {
     Title = "Mob ESP",
-    Values = {"None", "Sarka", "Gen"},
+    Values = {"None", "Sarka", "Gen", "Igicho", "Booh"},
     Default = "None",
     Callback = function(value)
         applyMobESP(value)
@@ -292,16 +296,18 @@ Tabs.ESP:AddDropdown("MobESPSelector", {
 
 -- Mobs Tab
 Tabs.Mobs:AddParagraph({
-    Title = "Mob Features",
-    Content = "Warning: Move the script menu away from the center before enabling auto-farm (clicking may interfere with GUI)."
+    Title = "Important Note",
+    Content = "The desired mobs must be loaded/spawned in the world for the auto-farm to detect and target them."
 })
 
 local autoFarmSarkaEnabled = false
 local autoFarmGenEnabled = false
-local autoAttackEnabled = false  -- Tracks if the remote attack is active
+local autoFarmIgichoEnabled = false
+local autoFarmBoohEnabled = false
+local autoAttackEnabled = false
 
 local function enableAutoAttack()
-    if autoAttackEnabled then return end  -- Already active, don't re-fire
+    if autoAttackEnabled then return end
     local args = {"Setting", 10}
     pcall(function()
         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RemoteFunction"):InvokeServer(unpack(args))
@@ -309,29 +315,30 @@ local function enableAutoAttack()
     autoAttackEnabled = true
 end
 
-local function disableAutoAttack()
-    -- We don't disable it because turning off one mob farm shouldn't stop the other
-    -- Only disable if both are off (handled in toggles)
+local function checkAnyMobFarmActive()
+    return autoFarmSarkaEnabled or autoFarmGenEnabled or autoFarmIgichoEnabled or autoFarmBoohEnabled
 end
 
-Tabs.Mobs:AddToggle("AutoFarmSarka", {
-    Title = "Auto Farm Sarka",
-    Default = false,
-    Callback = function(state)
-        autoFarmSarkaEnabled = state
-        if state then
-            enableAutoAttack()  -- Turn on the remote attack
-            spawn(function()
-                while autoFarmSarkaEnabled do
-                    local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-                    local hrp = character:WaitForChild("HumanoidRootPart")
-                    local mobFolder = workspace.Scriptable.Mobs
-                    local closestMob = nil
-                    local closestDist = math.huge
-                    for _, mob in ipairs(mobFolder:GetChildren()) do
-                        if mob.Name == "1" and mob:FindFirstChild("HumanoidRootPart") then
-                            local mobRoot = mob:FindFirstChild("HumanoidRootPart")
-                            if mobRoot then
+local function createMobAutoFarm(mobName, toggleVarName, title)
+    Tabs.Mobs:AddToggle(toggleVarName, {
+        Title = title,
+        Default = false,
+        Callback = function(state)
+            _G[toggleVarName] = state
+
+            if state then
+                enableAutoAttack()
+                spawn(function()
+                    while _G[toggleVarName] do
+                        local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+                        local hrp = character:WaitForChild("HumanoidRootPart")
+                        local mobFolder = workspace.Scriptable.Mobs
+                        local closestMob = nil
+                        local closestDist = math.huge
+
+                        for _, mob in ipairs(mobFolder:GetChildren()) do
+                            if mob.Name == mobName and mob:FindFirstChild("HumanoidRootPart") then
+                                local mobRoot = mob:FindFirstChild("HumanoidRootPart")
                                 local dist = (hrp.Position - mobRoot.Position).Magnitude
                                 if dist < closestDist then
                                     closestDist = dist
@@ -339,88 +346,105 @@ Tabs.Mobs:AddToggle("AutoFarmSarka", {
                                 end
                             end
                         end
-                    end
-                    if closestMob then
-                        local mobRoot = closestMob:FindFirstChild("HumanoidRootPart")
-                        if mobRoot then
-                            hrp.CFrame = mobRoot.CFrame
+
+                        if closestMob and closestMob:FindFirstChild("HumanoidRootPart") then
+                            hrp.CFrame = closestMob.HumanoidRootPart.CFrame
                         end
+
+                        wait(0.1)
                     end
-                    wait(0.1)  -- Faster loop since attack is handled by remote
+                end)
+            else
+                if not checkAnyMobFarmActive() then
+                    autoAttackEnabled = false
                 end
-            end)
-        else
-            if not autoFarmGenEnabled then
-                autoAttackEnabled = false  -- Only disable if no mob farm is active
             end
         end
+    })
+end
+
+createMobAutoFarm("1", "AutoFarmSarka", "Auto Farm Sarka")
+createMobAutoFarm("2", "AutoFarmGen", "Auto Farm Gen")
+createMobAutoFarm("3", "AutoFarmIgicho", "Auto Farm Igicho")
+createMobAutoFarm("5", "AutoFarmBooh", "Auto Farm Booh")
+
+-- Codes Tab
+Tabs.Codes:AddParagraph({
+    Title = "Redeem Codes",
+    Content = "Click the button to redeem all codes.\n0.3s delay between each code."
+})
+
+local codeList = {
+    "YenCode",
+    "FreeChikara",
+    "FreeChikara2",
+    "FreeChikara3",
+    "BugFixes1",
+    "10Favs",
+    "10Likes",
+    "LASTFIX",
+    "Update1Point1",
+    "SorryForBugsLol",
+    "1kVisits",
+    "50Likes",
+    "1000Members",
+    "MobsUpdate",
+    "1WeekAnniversary",
+    "400CCU",
+    "10kVisits",
+    "100Favs",
+    "100CCU"
+}
+
+Tabs.Codes:AddButton({
+    Title = "Redeem All Codes",
+    Description = "0.3s delay between codes",
+    Callback = function()
+        local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RemoteFunction")
+        
+        local successCount = 0
+        local failCount = 0
+
+        for _, code in ipairs(codeList) do
+            local args = {"Code", code}
+            local success, result = pcall(function()
+                return remote:InvokeServer(unpack(args))
+            end)
+
+            if success and result ~= false then
+                successCount = successCount + 1
+                Fluent:Notify({
+                    Title = "Code Redeemed",
+                    Content = "Success: " .. code,
+                    Duration = 2
+                })
+            else
+                failCount = failCount + 1
+                Fluent:Notify({
+                    Title = "Code Failed",
+                    Content = "Failed: " .. code,
+                    Duration = 2
+                })
+            end
+
+            wait(0.3)
+        end
+
+        Fluent:Notify({
+            Title = "All Codes Processed!",
+            Content = "Successfully redeemed: " .. successCount .. "\nFailed or already used: " .. failCount,
+            Duration = 10
+        })
     end
 })
 
-Tabs.Mobs:AddToggle("AutoFarmGen", {
-    Title = "Auto Farm Gen",
-    Default = false,
-    Callback = function(state)
-        autoFarmGenEnabled = state
-        if state then
-            enableAutoAttack()  -- Turn on the remote attack
-            spawn(function()
-                while autoFarmGenEnabled do
-                    local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-                    local hrp = character:WaitForChild("HumanoidRootPart")
-                    local mobFolder = workspace.Scriptable.Mobs
-                    local closestMob = nil
-                    local closestDist = math.huge
-                    for _, mob in ipairs(mobFolder:GetChildren()) do
-                        if mob.Name == "2" and mob:FindFirstChild("HumanoidRootPart") then
-                            local mobRoot = mob:FindFirstChild("HumanoidRootPart")
-                            if mobRoot then
-                                local dist = (hrp.Position - mobRoot.Position).Magnitude
-                                if dist < closestDist then
-                                    closestDist = dist
-                                    closestMob = mob
-                                end
-                            end
-                        end
-                    end
-                    if closestMob then
-                        local mobRoot = closestMob:FindFirstChild("HumanoidRootPart")
-                        if mobRoot then
-                            hrp.CFrame = mobRoot.CFrame
-                        end
-                    end
-                    wait(0.1)
-                end
-            end)
-        else
-            if not autoFarmSarkaEnabled then
-                autoAttackEnabled = false
-            end
-        end
-    end
-})
-
--- Chikara Tab (unchanged)
-Tabs.Chikara:AddParagraph({Title = "Chikara Auto Farm", Content = "Automatically teleports to and collects Chikara Boxes by clicking them."})
-
+-- Chikara Tab
 Tabs.Chikara:AddParagraph({
     Title = "Important Note",
-    Content = "After enabling the auto farm, make sure to minimize the menu by pressing Left Control (LCTRL) so the clicks can reach the boxes!"
+    Content = "Works perfectly with GUI open — no minimizing needed!"
 })
 
 local AutoFarmChikaraEnabled = false
-
-local function clickChikaraBox(boxPart)
-    if not boxPart then return end
-    local cam = workspace.CurrentCamera
-    local pos, onScreen = cam:WorldToScreenPoint(boxPart.Position)
-    if onScreen then
-        local VirtualInputManager = game:GetService("VirtualInputManager")
-        VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
-        wait()
-        VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
-    end
-end
 
 Tabs.Chikara:AddToggle("AutoFarmChikara", {
     Title = "Auto Farm Chikara Box",
@@ -433,23 +457,43 @@ Tabs.Chikara:AddToggle("AutoFarmChikara", {
                     local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
                     local hrp = character:WaitForChild("HumanoidRootPart")
                     local folder = workspace.Scriptable.ChikaraBoxes
+                    
+                    local closestBox = nil
+                    local closestDist = math.huge
+                    
                     for _, box in ipairs(folder:GetChildren()) do
-                        if not AutoFarmChikaraEnabled then break end
-                        if box:IsA("BasePart") then
-                            hrp.CFrame = box.CFrame
-                            wait(0.05)
-                            clickChikaraBox(box)
-                            wait(0.15)
+                        local clickBox = box:FindFirstChild("ClickBox")
+                        if clickBox then
+                            local clickDetector = clickBox:FindFirstChild("ClickDetector")
+                            if clickDetector then
+                                local dist = (hrp.Position - clickBox.Position).Magnitude
+                                if dist < closestDist then
+                                    closestDist = dist
+                                    closestBox = box
+                                end
+                            end
                         end
                     end
-                    wait(0.3)
+                    
+                    if closestBox then
+                        local clickBox = closestBox.ClickBox
+                        local clickDetector = clickBox.ClickDetector
+                        
+                        hrp.CFrame = clickBox.CFrame
+                        
+                        fireclickdetector(clickDetector)
+                        wait(0.5)
+                        fireclickdetector(clickDetector)
+                    else
+                        wait(0.5)
+                    end
                 end
             end)
         end
     end
 })
 
--- Misc Tab (unchanged)
+-- Misc Tab
 Tabs.Misc:AddParagraph({Title = "Miscellaneous", Content = "Extra useful features."})
 
 local AntiAFKEnabled = false
